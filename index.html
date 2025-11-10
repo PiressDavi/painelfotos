@@ -98,18 +98,26 @@
       });
     }
 
-    // 💾 Download da foto
-    function baixarFoto(url) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'foto.jpg';
-      a.click();
+    // 💾 Download real da foto
+    async function baixarFoto(url) {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `foto_${Date.now()}.jpg`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } catch (err) {
+        console.error('Erro ao baixar foto:', err);
+        alert('Não foi possível baixar a foto 😢');
+      }
     }
 
-    // 🔁 Recarregar a cada 5 segundos (simples e eficiente)
+    // 🔁 Recarregar a cada 5 segundos
     setInterval(carregarFotos, 5000);
 
-    // ⏱️ Carrega ao abrir a página
+    // ⏱️ Carrega ao abrir
     carregarFotos();
   </script>
 </body>
