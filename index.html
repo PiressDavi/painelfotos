@@ -25,6 +25,7 @@
       max-width: 1200px;
     }
     .foto {
+      position: relative;
       background: white;
       padding: 10px;
       border-radius: 10px;
@@ -47,6 +48,18 @@
     button:hover {
       background: #0056b3;
     }
+    /* ✅ Ícone de OK no canto superior direito */
+    .ok-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: #28a745;
+      color: white;
+      font-size: 16px;
+      padding: 5px 8px;
+      border-radius: 50%;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
   </style>
 </head>
 <body>
@@ -54,12 +67,14 @@
   <div class="grid" id="fotosGrid"></div>
 
   <script>
-    // 🔑 Suas credenciais Supabase
+    // 🔑 Credenciais Supabase
     const SUPABASE_URL = "https://czhtdbjkscsqsrgawobg.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6aHRkYmprc2NzcXNyZ2F3b2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3OTg4NjQsImV4cCI6MjA3ODM3NDg2NH0.yPH_BrOGNbf-tZMx2zk0_xEcm0K9fyhUo2A8Ug6i3ms";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
     const fotosGrid = document.getElementById('fotosGrid');
+
+    // 🔁 Lista de fotos já baixadas (salvas no navegador)
+    const fotosBaixadas = JSON.parse(localStorage.getItem('fotosBaixadas') || '[]');
 
     // 🖼️ Carregar fotos do bucket
     async function carregarFotos() {
@@ -85,29 +100,52 @@
           .storage
           .from('fotos-convidados')
           .getPublicUrl(foto.name);
-
         const url = urlData.publicUrl;
 
         const div = document.createElement('div');
         div.classList.add('foto');
+
+        // Verifica se já foi baixada
+        const jaBaixada = fotosBaixadas.includes(foto.name);
+
         div.innerHTML = `
+          ${jaBaixada ? '<div class="ok-badge">✅</div>' : ''}
           <img src="${url}" alt="Foto enviada">
-          <button onclick="baixarFoto('${url}')">Baixar</button>
+          <button onclick="baixarFoto('${url}', '${foto.name}', this)">Baixar</button>
         `;
         fotosGrid.appendChild(div);
       });
     }
 
-    // 💾 Download real da foto
-    async function baixarFoto(url) {
+    // 💾 Baixar foto com confirmação e ícone de OK
+    async function baixarFoto(url, nomeFoto, botao) {
+      const jaBaixada = fotosBaixadas.includes(nomeFoto);
+
+      if (jaBaixada) {
+        const confirmar = confirm("Essa foto já foi baixada. Deseja baixar novamente?");
+        if (!confirmar) return;
+      }
+
       try {
         const response = await fetch(url);
         const blob = await response.blob();
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `foto_${Date.now()}.jpg`;
+        link.download = nomeFoto;
         link.click();
         URL.revokeObjectURL(link.href);
+
+        // Marca como baixada
+        if (!jaBaixada) {
+          fotosBaixadas.push(nomeFoto);
+          localStorage.setItem('fotosBaixadas', JSON.stringify(fotosBaixadas));
+          const fotoDiv = botao.closest('.foto');
+          const badge = document.createElement('div');
+          badge.classList.add('ok-badge');
+          badge.textContent = '✅';
+          fotoDiv.appendChild(badge);
+        }
+
       } catch (err) {
         console.error('Erro ao baixar foto:', err);
         alert('Não foi possível baixar a foto 😢');
