@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Painel de Fotos - Casamento</title>
+
+  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     body {
       background: #f9f9f9;
@@ -48,7 +51,6 @@
     button:hover {
       background: #0056b3;
     }
-    /* ✅ Ícone de OK no canto superior direito */
     .ok-badge {
       position: absolute;
       top: 8px;
@@ -62,6 +64,7 @@
     }
   </style>
 </head>
+
 <body>
   <h1>📸 Painel de Fotos dos Convidados</h1>
   <div class="grid" id="fotosGrid"></div>
@@ -70,18 +73,29 @@
     // 🔑 Credenciais Supabase
     const SUPABASE_URL = "https://czhtdbjkscsqsrgawobg.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6aHRkYmprc2NzcXNyZ2F3b2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3OTg4NjQsImV4cCI6MjA3ODM3NDg2NH0.yPH_BrOGNbf-tZMx2zk0_xEcm0K9fyhUo2A8Ug6i3ms";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ✅ Cliente Supabase (nome corrigido)
+    const supabaseClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
     const fotosGrid = document.getElementById('fotosGrid');
 
-    // 🔁 Lista de fotos já baixadas (salvas no navegador)
-    const fotosBaixadas = JSON.parse(localStorage.getItem('fotosBaixadas') || '[]');
+    // 🔁 Fotos já baixadas
+    const fotosBaixadas = JSON.parse(
+      localStorage.getItem('fotosBaixadas') || '[]'
+    );
 
-    // 🖼️ Carregar fotos do bucket
+    // 🖼️ Carregar fotos
     async function carregarFotos() {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .storage
         .from('fotos-convidados')
-        .list('', { limit: 100, sortBy: { column: 'name', order: 'desc' } });
+        .list('', {
+          limit: 100,
+          sortBy: { column: 'name', order: 'desc' }
+        });
 
       if (error) {
         console.error('Erro ao listar fotos:', error);
@@ -96,66 +110,66 @@
       }
 
       data.forEach((foto) => {
-        const { data: urlData } = supabase
+        const { data: urlData } = supabaseClient
           .storage
           .from('fotos-convidados')
           .getPublicUrl(foto.name);
-        const url = urlData.publicUrl;
 
         const div = document.createElement('div');
-        div.classList.add('foto');
+        div.className = 'foto';
 
-        // Verifica se já foi baixada
         const jaBaixada = fotosBaixadas.includes(foto.name);
 
         div.innerHTML = `
           ${jaBaixada ? '<div class="ok-badge">✅</div>' : ''}
-          <img src="${url}" alt="Foto enviada">
-          <button onclick="baixarFoto('${url}', '${foto.name}', this)">Baixar</button>
+          <img src="${urlData.publicUrl}" alt="Foto enviada">
+          <button onclick="baixarFoto('${urlData.publicUrl}', '${foto.name}', this)">
+            Baixar
+          </button>
         `;
+
         fotosGrid.appendChild(div);
       });
     }
 
-    // 💾 Baixar foto com confirmação e ícone de OK
+    // 💾 Baixar foto
     async function baixarFoto(url, nomeFoto, botao) {
       const jaBaixada = fotosBaixadas.includes(nomeFoto);
 
-      if (jaBaixada) {
-        const confirmar = confirm("Essa foto já foi baixada. Deseja baixar novamente?");
-        if (!confirmar) return;
+      if (jaBaixada && !confirm("Essa foto já foi baixada. Deseja baixar novamente?")) {
+        return;
       }
 
       try {
         const response = await fetch(url);
         const blob = await response.blob();
+
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = nomeFoto;
         link.click();
+
         URL.revokeObjectURL(link.href);
 
-        // Marca como baixada
         if (!jaBaixada) {
           fotosBaixadas.push(nomeFoto);
           localStorage.setItem('fotosBaixadas', JSON.stringify(fotosBaixadas));
-          const fotoDiv = botao.closest('.foto');
-          const badge = document.createElement('div');
-          badge.classList.add('ok-badge');
-          badge.textContent = '✅';
-          fotoDiv.appendChild(badge);
-        }
 
+          const badge = document.createElement('div');
+          badge.className = 'ok-badge';
+          badge.textContent = '✅';
+          botao.closest('.foto').appendChild(badge);
+        }
       } catch (err) {
-        console.error('Erro ao baixar foto:', err);
+        console.error(err);
         alert('Não foi possível baixar a foto 😢');
       }
     }
 
-    // 🔁 Recarregar a cada 5 segundos
+    // 🔁 Atualiza automaticamente
     setInterval(carregarFotos, 5000);
 
-    // ⏱️ Carrega ao abrir
+    // ⏱️ Primeira carga
     carregarFotos();
   </script>
 </body>
