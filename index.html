@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Painel de Fotos - Casamento</title>
 
-  <!-- Supabase SDK -->
+  <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -17,9 +17,11 @@
       align-items: center;
       padding: 20px;
     }
+
     h1 {
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -27,6 +29,7 @@
       width: 100%;
       max-width: 1200px;
     }
+
     .foto {
       position: relative;
       background: white;
@@ -35,10 +38,13 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       text-align: center;
     }
-    img {
+
+    .foto img {
       width: 100%;
       border-radius: 10px;
+      object-fit: cover;
     }
+
     button {
       margin-top: 10px;
       background: #007bff;
@@ -48,9 +54,11 @@
       border-radius: 8px;
       cursor: pointer;
     }
+
     button:hover {
       background: #0056b3;
     }
+
     .ok-badge {
       position: absolute;
       top: 8px;
@@ -62,6 +70,12 @@
       border-radius: 50%;
       box-shadow: 0 0 5px rgba(0,0,0,0.2);
     }
+
+    .empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: #666;
+    }
   </style>
 </head>
 
@@ -70,73 +84,81 @@
   <div class="grid" id="fotosGrid"></div>
 
   <script>
-    // 🔑 Credenciais Supabase
+    // 🔑 SUPABASE CONFIG
     const SUPABASE_URL = "https://czhtdbjkscsqsrgawobg.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6aHRkYmprc2NzcXNyZ2F3b2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3OTg4NjQsImV4cCI6MjA3ODM3NDg2NH0.yPH_BrOGNbf-tZMx2zk0_xEcm0K9fyhUo2A8Ug6i3ms";
 
-    // ✅ Cliente Supabase (nome corrigido)
-    const supabaseClient = window.supabase.createClient(
+    const supabaseClient = supabase.createClient(
       SUPABASE_URL,
       SUPABASE_KEY
     );
 
     const fotosGrid = document.getElementById('fotosGrid');
+    const fotosBaixadas = JSON.parse(localStorage.getItem('fotosBaixadas') || '[]');
 
-    // 🔁 Fotos já baixadas
-    const fotosBaixadas = JSON.parse(
-      localStorage.getItem('fotosBaixadas') || '[]'
-    );
+    let carregando = false;
 
-    // 🖼️ Carregar fotos
+    // 📸 CARREGAR FOTOS
     async function carregarFotos() {
-      const { data, error } = await supabaseClient
-        .storage
-        .from('fotos-convidados')
-        .list('', {
-          limit: 100,
-          sortBy: { column: 'name', order: 'desc' }
-        });
+      if (carregando) return;
+      carregando = true;
 
-      if (error) {
-        console.error('Erro ao listar fotos:', error);
-        return;
-      }
-
-      fotosGrid.innerHTML = '';
-
-      if (!data || data.length === 0) {
-        fotosGrid.innerHTML = '<p>Nenhuma foto enviada ainda.</p>';
-        return;
-      }
-
-      data.forEach((foto) => {
-        const { data: urlData } = supabaseClient
+      try {
+        const { data, error } = await supabaseClient
           .storage
           .from('fotos-convidados')
-          .getPublicUrl(foto.name);
+          .list('', {
+            limit: 100,
+            sortBy: { column: 'name', order: 'desc' }
+          });
 
-        const div = document.createElement('div');
-        div.className = 'foto';
+        if (error) {
+          console.error('Erro ao listar fotos:', error);
+          fotosGrid.innerHTML = '<p class="empty">Erro ao carregar fotos.</p>';
+          return;
+        }
 
-        const jaBaixada = fotosBaixadas.includes(foto.name);
+        fotosGrid.innerHTML = '';
 
-        div.innerHTML = `
-          ${jaBaixada ? '<div class="ok-badge">✅</div>' : ''}
-          <img src="${urlData.publicUrl}" alt="Foto enviada">
-          <button onclick="baixarFoto('${urlData.publicUrl}', '${foto.name}', this)">
-            Baixar
-          </button>
-        `;
+        const fotosValidas = data.filter(f => f.name.includes('.'));
 
-        fotosGrid.appendChild(div);
-      });
+        if (fotosValidas.length === 0) {
+          fotosGrid.innerHTML = '<p class="empty">Nenhuma foto enviada ainda.</p>';
+          return;
+        }
+
+        fotosValidas.forEach(foto => {
+          const { data: urlData } = supabaseClient
+            .storage
+            .from('fotos-convidados')
+            .getPublicUrl(foto.name);
+
+          const jaBaixada = fotosBaixadas.includes(foto.name);
+
+          const div = document.createElement('div');
+          div.className = 'foto';
+
+          div.innerHTML = `
+            ${jaBaixada ? '<div class="ok-badge">✅</div>' : ''}
+            <img src="${urlData.publicUrl}" alt="Foto enviada">
+            <button onclick="baixarFoto('${urlData.publicUrl}', '${foto.name}', this)">
+              Baixar
+            </button>
+          `;
+
+          fotosGrid.appendChild(div);
+        });
+
+      } finally {
+        carregando = false;
+      }
     }
 
-    // 💾 Baixar foto
+    // 💾 BAIXAR FOTO
     async function baixarFoto(url, nomeFoto, botao) {
       const jaBaixada = fotosBaixadas.includes(nomeFoto);
 
-      if (jaBaixada && !confirm("Essa foto já foi baixada. Deseja baixar novamente?")) {
+      if (jaBaixada && !confirm('Essa foto já foi baixada. Deseja baixar novamente?')) {
         return;
       }
 
@@ -160,17 +182,16 @@
           badge.textContent = '✅';
           botao.closest('.foto').appendChild(badge);
         }
+
       } catch (err) {
         console.error(err);
-        alert('Não foi possível baixar a foto 😢');
+        alert('Não foi possível baixar a foto.');
       }
     }
 
-    // 🔁 Atualiza automaticamente
-    setInterval(carregarFotos, 5000);
-
-    // ⏱️ Primeira carga
+    // ⏱️ AUTO-REFRESH
     carregarFotos();
+    setInterval(carregarFotos, 5000);
   </script>
 </body>
 </html>
